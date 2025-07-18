@@ -4,6 +4,25 @@
 #include <stdio.h>
 #include <string.h>
 
+#define USE_OPENSSL 1
+
+#ifndef  USE_OPENSSL
+//sudo apt-get install libcrypto++-dev libcrypto++-doc libcrypto++-utils
+#include <cryptopp/hmac.h>
+#include <cryptopp/sha.h>
+#include <cryptopp/hex.h>
+#include <string>
+#else
+//sudo apt-get install libssl-dev
+#include <iostream>
+#include <openssl/hmac.h>
+#include <openssl/evp.h>
+#include <string>
+#include <iomanip>
+#include <sstream>
+#endif
+
+
 // 定义常量
 #define SM3_DIGEST_SIZE 32    // 摘要长度(字节)
 
@@ -169,6 +188,28 @@ void sm3_final(SM3_CTX* ctx, uint8_t digest[SM3_DIGEST_SIZE]) {
     }
 }
 
+#ifndef  USE_OPENSSL
+std::string hmac_sha256_cryptopp(const std::string& key, const std::string& data) {
+    using namespace CryptoPP;
+    HMAC<SHA256> hmac((const byte*)key.data(), key.size());
+    std::string result;
+    StringSource ss1(data, true,
+       new HashFilter(hmac,
+          new HexEncoder(new StringSink(result))));
+    return result;
+}
+#else
+std::string hmac_sha256_openssl(const std::string& key, const std::string& data) {
+    unsigned char* digest = HMAC(EVP_sha256(), key.data(), key.size(),
+                                reinterpret_cast<const unsigned char*>(data.data()), data.size(), nullptr, nullptr);
+    char md_string[2*EVP_MAX_MD_SIZE]; // 2 hex characters per byte
+    for (int i = 0; i < EVP_MD_size(EVP_sha256()); ++i) {
+        sprintf(&md_string[i*2], "%02x", digest[i]);
+    }
+    return std::string(md_string);
+}
+#endif
+
 
 // 辅助函数：打印十六进制
 void print_hex(const uint8_t* data, size_t len) {
@@ -189,7 +230,30 @@ int main() {
     sm3_update(&ctx,reinterpret_cast<const uint8_t*>(test_str),strlen(test_str));
     sm3_final(&ctx, hash_result);
     print_hex(hash_result, 32);
+    //SM3-HASH
     //65460e63cd2e30b5b12a2fe821f934fddb282f6b596d397c3f5ebbc81ec1c9e6    --JAVA
     //65460e63cd2e30b5b12a2fe821f934fddb282f6b596d397c3f5ebbc81ec1c9e6    --C++
+    //SM3-HMAC
+    //2c2d7be4307a1a030c018f9ff34be0180369d209ca2965293150588c9669b7df
+    //
+
+    //使用第三方库openssl or cryptopp  注：第三方库不实现SM3
+    //HMAC TEST for cryptopp  hmac
+    std::string key = "secretKey"; // 密钥
+    std::string data = "Hello, HMAC-SM3!"; // 要进行HMAC的数据
+#ifndef  USE_OPENSSL
+    std::string hmac1 = hmac_sha256_cryptopp(key, data);
+    std::cout << "HMAC cryptopp SHA-256: " << hmac1 << std::endl;
+#else
+    std::string hmac = hmac_sha256_openssl(key, data);
+    std::cout << "HMAC OPENSSL SHA-256: " << hmac << std::endl;
+    //ba993015a6e3cee9d632f52144c69db853f7a04ca6335139d2d538d0e49ab30a     ---SHA256
+#endif
+
+    //纯C++实现HMAC WITH SM3
+
+
     return 0;
 }
+
+
