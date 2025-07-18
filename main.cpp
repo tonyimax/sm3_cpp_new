@@ -208,8 +208,27 @@ std::string hmac_sha256_openssl(const std::string& key, const std::string& data)
     }
     return std::string(md_string);
 }
-#endif
 
+std::string hmac_sm3(const std::string& key, const std::string& data) {
+    unsigned char* md = (unsigned char*)OPENSSL_malloc(EVP_MAX_MD_SIZE);
+    unsigned int md_len;
+    HMAC_CTX* ctx = HMAC_CTX_new();
+    HMAC_Init_ex(ctx, key.c_str(), key.size(), EVP_sm3(), nullptr);
+    HMAC_Update(ctx, reinterpret_cast<const unsigned char*>(data.c_str()), data.size());
+    HMAC_Final(ctx, md, &md_len);
+    HMAC_CTX_free(ctx);
+
+    std::string result;
+    for (unsigned int i = 0; i < md_len; i++) {
+        char hex[3];
+        sprintf(hex, "%02x", md[i]);
+        result += hex;
+    }
+    OPENSSL_free(md);
+    return result;
+}
+
+#endif
 
 // 辅助函数：打印十六进制
 void print_hex(const uint8_t* data, size_t len) {
@@ -234,8 +253,8 @@ int main() {
     //65460e63cd2e30b5b12a2fe821f934fddb282f6b596d397c3f5ebbc81ec1c9e6    --JAVA
     //65460e63cd2e30b5b12a2fe821f934fddb282f6b596d397c3f5ebbc81ec1c9e6    --C++
     //SM3-HMAC
-    //2c2d7be4307a1a030c018f9ff34be0180369d209ca2965293150588c9669b7df
-    //
+    //2c2d7be4307a1a030c018f9ff34be0180369d209ca2965293150588c9669b7df    --JAVA
+    //2c2d7be4307a1a030c018f9ff34be0180369d209ca2965293150588c9669b7df    --C++
 
     //使用第三方库openssl or cryptopp  注：第三方库不实现SM3
     //HMAC TEST for cryptopp  hmac
@@ -245,9 +264,15 @@ int main() {
     std::string hmac1 = hmac_sha256_cryptopp(key, data);
     std::cout << "HMAC cryptopp SHA-256: " << hmac1 << std::endl;
 #else
-    std::string hmac = hmac_sha256_openssl(key, data);
-    std::cout << "HMAC OPENSSL SHA-256: " << hmac << std::endl;
+    //hmac_sha256
+    std::string hmac_sha256_string = hmac_sha256_openssl(key, data);
+    std::cout << "HMAC OPENSSL SHA-256: " << hmac_sha256_string << std::endl;
     //ba993015a6e3cee9d632f52144c69db853f7a04ca6335139d2d538d0e49ab30a     ---SHA256
+
+    //hmac_sm3
+    std::string hmac_sm3_string = hmac_sm3(key, data);
+    std::cout << "HMAC OPENSSL SM3: " << hmac_sm3_string << std::endl;
+    //2c2d7be4307a1a030c018f9ff34be0180369d209ca2965293150588c9669b7df     ---SM3
 #endif
 
     //纯C++实现HMAC WITH SM3
@@ -255,5 +280,6 @@ int main() {
 
     return 0;
 }
+
 
 
