@@ -4,7 +4,7 @@
 #include <stdio.h>
 #include <string.h>
 
-//#define USE_OPENSSL 1
+#define USE_OPENSSL 1
 
 #ifndef  USE_OPENSSL
 //sudo apt-get install libcrypto++-dev libcrypto++-doc libcrypto++-utils
@@ -200,6 +200,17 @@ std::string hmac_sha256_cryptopp(const std::string& key, const std::string& data
           new HexEncoder(new StringSink(result))));
     return result;
 }
+
+std::string hmac_sm3_cryptopp(const std::string& key, const std::string& data) {
+    using namespace CryptoPP;
+    std::string digest;
+    std::string result;
+    HMAC<SM3> hmac((const byte*)key.data(), key.size());
+    StringSource ss(data, true,new HashFilter(hmac,new StringSink(digest)));
+    StringSource(digest, true, new HexEncoder(new StringSink(result)));
+    return result;
+}
+
 #else
 std::string hmac_sha256_openssl(const std::string& key, const std::string& data) {
     unsigned char* digest = HMAC(EVP_sha256(), key.data(), key.size(),
@@ -211,7 +222,7 @@ std::string hmac_sha256_openssl(const std::string& key, const std::string& data)
     return std::string(md_string);
 }
 
-std::string hmac_sm3(const std::string& key, const std::string& data) {
+std::string hmac_sm3_openssl(const std::string& key, const std::string& data) {
     unsigned char* md = (unsigned char*)OPENSSL_malloc(EVP_MAX_MD_SIZE);
     unsigned int md_len;
     HMAC_CTX* ctx = HMAC_CTX_new();
@@ -264,18 +275,12 @@ int main() {
     std::string key = "secretKey"; // 密钥
     std::string data = "Hello, HMAC-SM3!"; // 要进行HMAC的数据
 #ifndef  USE_OPENSSL
-    std::string hmac1 = hmac_sha256_cryptopp(key, data);
-    std::cout << "HMAC CRYPTOPP SHA-256: " << hmac1 << std::endl;
-
-    //HMAC TEST for cryptopp hmac_sm3
-    using namespace CryptoPP;
-    HMAC<SM3> hmac((const byte*)key.data(), key.size());
-    std::string digest;
-    StringSource ss(data, true,new HashFilter(hmac,new StringSink(digest)));
-    std::cout << "HMAC CRYPTOPP SM3: ";
-    std::string result;
-    StringSource(digest, true, new HexEncoder(new StringSink(result)));
-    std::cout <<result.c_str()<< std::endl;
+    //sha256 hash
+    std::string hmac_256 = hmac_sha256_cryptopp(key, data);
+    std::cout << "HMAC CRYPTOPP SHA-256: " << hmac_256 << std::endl;
+    //sm3 hash
+    std::string hmac_sm3 = hmac_sm3_cryptopp(key,data);
+    std::cout << "HMAC CRYPTOPP SM3: "<<hmac_sm3.c_str()<<std::endl;
 #else
     //hmac_sha256
     std::string hmac_sha256_string = hmac_sha256_openssl(key, data);
@@ -283,7 +288,7 @@ int main() {
     //ba993015a6e3cee9d632f52144c69db853f7a04ca6335139d2d538d0e49ab30a     ---SHA256
 
     //hmac_sm3
-    std::string hmac_sm3_string = hmac_sm3(key, data);
+    std::string hmac_sm3_string = hmac_sm3_openssl(key, data);
     std::cout << "HMAC OPENSSL SM3: " << hmac_sm3_string << std::endl;
     //2c2d7be4307a1a030c018f9ff34be0180369d209ca2965293150588c9669b7df     ---SM3
 #endif
