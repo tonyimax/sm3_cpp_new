@@ -4,13 +4,15 @@
 #include <stdio.h>
 #include <string.h>
 
-#define USE_OPENSSL 1
+//#define USE_OPENSSL 1
 
 #ifndef  USE_OPENSSL
 //sudo apt-get install libcrypto++-dev libcrypto++-doc libcrypto++-utils
 #include <cryptopp/hmac.h>
 #include <cryptopp/sha.h>
 #include <cryptopp/hex.h>
+#include <cryptopp/sm3.h>
+#include <cryptopp/filters.h>
 #include <string>
 #else
 //sudo apt-get install libssl-dev
@@ -232,6 +234,7 @@ std::string hmac_sm3(const std::string& key, const std::string& data) {
 
 // 辅助函数：打印十六进制
 void print_hex(const uint8_t* data, size_t len) {
+    std::cout <<"SM3 HASH : ";
     for (size_t i = 0; i < len; ++i) {
         std::cout << std::hex << std::setw(2) << std::setfill('0')
                   << static_cast<int>(data[i]);
@@ -257,12 +260,22 @@ int main() {
     //2c2d7be4307a1a030c018f9ff34be0180369d209ca2965293150588c9669b7df    --C++
 
     //使用第三方库openssl or cryptopp  注：第三方库不实现SM3
-    //HMAC TEST for cryptopp  hmac
+    //HMAC TEST for cryptopp  hmac_sha256
     std::string key = "secretKey"; // 密钥
     std::string data = "Hello, HMAC-SM3!"; // 要进行HMAC的数据
 #ifndef  USE_OPENSSL
     std::string hmac1 = hmac_sha256_cryptopp(key, data);
-    std::cout << "HMAC cryptopp SHA-256: " << hmac1 << std::endl;
+    std::cout << "HMAC CRYPTOPP SHA-256: " << hmac1 << std::endl;
+
+    //HMAC TEST for cryptopp hmac_sm3
+    using namespace CryptoPP;
+    HMAC<SM3> hmac((const byte*)key.data(), key.size());
+    std::string digest;
+    StringSource ss(data, true,new HashFilter(hmac,new StringSink(digest)));
+    std::cout << "HMAC CRYPTOPP SM3: ";
+    std::string result;
+    StringSource(digest, true, new HexEncoder(new StringSink(result)));
+    std::cout <<result.c_str()<< std::endl;
 #else
     //hmac_sha256
     std::string hmac_sha256_string = hmac_sha256_openssl(key, data);
